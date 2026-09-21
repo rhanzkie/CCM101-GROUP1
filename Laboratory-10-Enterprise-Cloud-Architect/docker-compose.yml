@@ -1,0 +1,76 @@
+services:
+
+  wordpress:
+    image: wordpress:latest
+    container_name: cloudapp_wordpress
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress123
+      WORDPRESS_DB_NAME: wordpress
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - cloud_network
+
+  db:
+    image: mysql:8.0
+    container_name: cloudapp_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress123
+      MYSQL_ROOT_PASSWORD: rootpassword123
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - cloud_network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-prootpassword123"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  telemetry:
+    build: ./telemetry
+    container_name: cloudapp_telemetry
+    restart: unless-stopped
+    ports:
+      - "9091:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - wordpress
+      - db
+    networks:
+      - cloud_network
+
+volumes:
+
+  wordpress_data:
+    name: cloudapp_wordpress_data
+
+  db_data:
+    name: cloudapp_db_data
+
+networks:
+
+  cloud_network:
+    name: cloudapp_network
+    driver: bridge
